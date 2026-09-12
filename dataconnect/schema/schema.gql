@@ -1,0 +1,40 @@
+type User @table {
+  email: String!
+  name: String!
+  currencyPreference: String
+}
+
+type Counterparty @table {
+  name: String!
+  type: String!
+  contactEmail: String
+  website: String
+  user: User!
+}
+
+type Category @table {
+  label: String!
+  type: String!
+  user: User!
+}
+
+type Payment @table {
+  amount: Float!
+  status: String!
+  dueDate: Date!
+  type: String!
+  description: String
+  paymentDate: Date
+  user: User!
+  counterparty: Counterparty
+  category: Category
+}
+
+type RecurringProfile @table {
+  frequency: String!
+  startDate: Date!
+  endDate: Date
+  isActive: Boolean
+  payment: Payment!
+  user: User!
+}

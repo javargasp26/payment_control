@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub get:=)",
+      "Write(//Users/ja.vargas/AndroidStudioProjects/payment_control/README.md)",
+      "Bash(flutter run -d chrome --web-renderer html:=)",
+      "Bash(flutter analyze:=)",
+      "Bash(flutter analyze lib/screens/realizar_pago_screen.dart:=)",
+      "Bash(flutter analyze lib/services/abono_service.dart:=)",
+      "Bash(flutter analyze lib/services/abono_service.dart lib/screens/realizar_pago_screen.dart:=)"
+    ]
+  }
+}

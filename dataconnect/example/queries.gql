@@ -1,0 +1,107 @@
+mutation CreateUser {
+  user_insert(data: {id_expr: "auth.uid", email: "user@example.com", name: "New User"})
+}
+
+mutation CreateCategory {
+  category_insert(data: {label: "Groceries", type: "Expense", user: {id_expr: "auth.uid"}})
+}
+
+mutation CreateCounterparty {
+  counterparty_insert(data: {name: "Local Market", type: "Store", user: {id_expr: "auth.uid"}})
+}
+
+mutation CreatePayment {
+  payment_insert(data: {amount: 50.0, status: "Pending", dueDate: "2023-12-31", type: "Debit", user: {id_expr: "auth.uid"}})
+}
+
+mutation CreateRecurringProfile {
+  recurringProfile_insert(data: {frequency: "Monthly", startDate: "2023-01-01", payment: {id: "00000000-0000-0000-0000-000000000000"}, user: {id_expr: "auth.uid"}})
+}
+
+mutation UpdateUser {
+  user_update(key: {id_expr: "auth.uid"}, data: {name: "Updated Name"})
+}
+
+mutation UpdateCategory($id: UUID!) {
+  category_update(key: {id: $id}, data: {label: "Updated Label"})
+}
+
+mutation UpdateCounterparty($id: UUID!) {
+  counterparty_update(key: {id: $id}, data: {website: "https://example.com"})
+}
+
+mutation UpdatePayment($id: UUID!) {
+  payment_update(key: {id: $id}, data: {status: "Paid"})
+}
+
+mutation UpdateRecurringProfile($id: UUID!) {
+  recurringProfile_update(key: {id: $id}, data: {isActive: true})
+}
+
+mutation DeleteUser {
+  user_delete(key: {id_expr: "auth.uid"})
+}
+
+mutation DeleteCategory($id: UUID!) {
+  category_delete(key: {id: $id})
+}
+
+mutation DeleteCounterparty($id: UUID!) {
+  counterparty_delete(key: {id: $id})
+}
+
+mutation DeletePayment($id: UUID!) {
+  payment_delete(key: {id: $id})
+}
+
+mutation DeleteRecurringProfile($id: UUID!) {
+  recurringProfile_delete(key: {id: $id})
+}
+
+query GetUser @auth(level: USER) {
+  user(key: {id_expr: "auth.uid"}) {
+    email
+    name
+  }
+}
+
+query GetCategory($id: UUID!) @auth(level: USER) {
+  category(key: {id: $id}) {
+    label
+  }
+}
+
+query GetCounterparty($id: UUID!) @auth(level: USER) {
+  counterparty(key: {id: $id}) {
+    name
+  }
+}
+
+query GetPayment($id: UUID!) @auth(level: USER) {
+  payment(key: {id: $id}) {
+    amount
+    status
+  }
+}
+
+query GetRecurringProfile($id: UUID!) @auth(level: USER) {
+  recurringProfile(key: {id: $id}) {
+    frequency
+  }
+}
+
+query ListMyData @auth(level: USER) {
+  categories(where: {userId: {eq_expr: "auth.uid"}}) {
+    label
+  }
+  counterparties(where: {userId: {eq_expr: "auth.uid"}}) {
+    name
+  }
+  payments(where: {userId: {eq_expr: "auth.uid"}}) {
+    amount
+    description
+  }
+  recurringProfiles(where: {userId: {eq_expr: "auth.uid"}}) {
+    frequency
+  }
+}

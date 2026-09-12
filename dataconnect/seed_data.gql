@@ -1,0 +1,26 @@
+mutation SeedData @transaction {
+  user_insertMany(data: [
+    { email: "alice@example.com", name: "Alice", currencyPreference: "USD" },
+    { email: "bob@example.com", name: "Bob", currencyPreference: "EUR" },
+    { email: "charlie@example.com", name: "Charlie", currencyPreference: "GBP" }
+  ])
+  counterparty_insertMany(data: [
+    { name: "Global Corp", type: "Vendor", user: { id: "00000000-0000-0000-0000-000000000000" } },
+    { name: "City Utilities", type: "Utility", user: { id: "00000000-0000-0000-0000-000000000000" } },
+    { name: "Freelance Services", type: "Service", user: { id: "00000000-0000-0000-0000-000000000001" } }
+  ])
+  category_insertMany(data: [
+    { label: "Software", type: "Expense", user: { id: "00000000-0000-0000-0000-000000000000" } },
+    { label: "Utilities", type: "Expense", user: { id: "00000000-0000-0000-0000-000000000000" } },
+    { label: "Consulting", type: "Revenue", user: { id: "00000000-0000-0000-0000-000000000001" } }
+  ])
+  payment_insertMany(data: [
+    { amount: 500.0, status: "Paid", dueDate: "2023-10-01", type: "Subscription", userId: "00000000-0000-0000-0000-000000000000", categoryId: "00000000-0000-0000-0000-000000000000", counterpartyId: "00000000-0000-0000-0000-000000000000" },
+    { amount: 150.5, status: "Pending", dueDate: "2023-10-15", type: "Service", userId: "00000000-0000-0000-0000-000000000000", categoryId: "00000000-0000-0000-0000-000000000001", counterpartyId: "00000000-0000-0000-0000-000000000001" },
+    { amount: 2000.0, status: "Paid", dueDate: "2023-11-01", type: "Invoice", userId: "00000000-0000-0000-0000-000000000001", categoryId: "00000000-0000-0000-0000-000000000002", counterpartyId: "00000000-0000-0000-0000-000000000002" }
+  ])
+  recurringProfile_insertMany(data: [
+    { frequency: "Monthly", startDate: "2023-01-01", isActive: true, paymentId: "00000000-0000-0000-0000-000000000000", userId: "00000000-0000-0000-0000-000000000000" },
+    { frequency: "Annually", startDate: "2023-06-01", isActive: true, paymentId: "00000000-0000-0000-0000-000000000002", userId: "00000000-0000-0000-0000-000000000001" }
+  ])
+}
