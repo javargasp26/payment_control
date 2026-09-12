@@ -1,11 +1,11 @@
 {
-    "name": "payment_control",
-    "short_name": "payment_control",
+    "name": "Control de Pagos",
+    "short_name": "Control Pagos",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FFFFFF",
+    "theme_color": "#2196F3",
+    "description": "Aplicación para gestionar el control de pagos en grupos de estudiantes de música.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

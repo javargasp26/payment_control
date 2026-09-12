@@ -9,11 +9,25 @@ class NinoService {
   /// Crea un nuevo niño en Firestore
   Future<Nino> crearNino({
     required String nombre,
+    String? segundoNombre,
+    required String primerApellido,
+    String? segundoApellido,
+    String? telefonoContacto,
+    required String nombreAcudiente,
+    required String telefonoAcudiente,
     required String grupoId,
+    required DateTime fechaIngreso,
   }) async {
     final docRef = await _firestore.collection(_collection).add({
       'nombre': nombre,
+      'segundoNombre': segundoNombre,
+      'primerApellido': primerApellido,
+      'segundoApellido': segundoApellido,
+      'telefonoContacto': telefonoContacto,
+      'nombreAcudiente': nombreAcudiente,
+      'telefonoAcudiente': telefonoAcudiente,
       'grupoId': grupoId,
+      'fechaIngreso': Timestamp.fromDate(fechaIngreso),
     });
 
     final doc = await docRef.get();
@@ -62,25 +76,52 @@ class NinoService {
     });
   }
 
-  /// Actualiza un niño existente
+  /// Actualiza un niño existente con los nuevos valores del formulario de
+  /// edición. Si `grupoId` cambia, solo se reasigna el niño al nuevo grupo:
+  /// los abonos ya registrados quedan asociados por `ninoId` (no por grupo),
+  /// por lo que su histórico no se ve afectado.
   Future<void> actualizarNino({
     required String id,
-    String? nombre,
-    String? grupoId,
+    required String nombre,
+    String? segundoNombre,
+    required String primerApellido,
+    String? segundoApellido,
+    String? telefonoContacto,
+    required String nombreAcudiente,
+    required String telefonoAcudiente,
+    required String grupoId,
+    required DateTime fechaIngreso,
   }) async {
-    final Map<String, dynamic> data = {};
-
-    if (nombre != null) data['nombre'] = nombre;
-    if (grupoId != null) data['grupoId'] = grupoId;
-
-    if (data.isNotEmpty) {
-      await _firestore.collection(_collection).doc(id).update(data);
-    }
+    await _firestore.collection(_collection).doc(id).update({
+      'nombre': nombre,
+      'segundoNombre': segundoNombre,
+      'primerApellido': primerApellido,
+      'segundoApellido': segundoApellido,
+      'telefonoContacto': telefonoContacto,
+      'nombreAcudiente': nombreAcudiente,
+      'telefonoAcudiente': telefonoAcudiente,
+      'grupoId': grupoId,
+      'fechaIngreso': Timestamp.fromDate(fechaIngreso),
+    });
   }
 
-  /// Elimina un niño por ID
+  /// Elimina un niño y todos sus abonos asociados de forma atómica: se usa
+  /// un WriteBatch para que, si algo falla, no se borre nada (ni el niño ni
+  /// sus abonos quedan a medio eliminar).
   Future<void> eliminarNino(String id) async {
-    await _firestore.collection(_collection).doc(id).delete();
+    final batch = _firestore.batch();
+
+    final abonosSnapshot = await _firestore
+        .collection('abonos')
+        .where('ninoId', isEqualTo: id)
+        .get();
+    for (final doc in abonosSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    batch.delete(_firestore.collection(_collection).doc(id));
+
+    await batch.commit();
   }
 
   /// Obtiene el conteo de niños en tiempo real

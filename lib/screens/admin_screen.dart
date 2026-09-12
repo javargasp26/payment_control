@@ -281,15 +281,17 @@ class _AdminScreenState extends State<AdminScreen> {
                       icon: const Icon(Icons.edit, size: 18),
                       label: const Text('Editar'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue,
-                        side: BorderSide(color: Colors.blue.shade300),
+                        foregroundColor: Colors.blueGrey.shade700,
+                        side: BorderSide(color: Colors.blueGrey.shade300),
+                        minimumSize: const Size(44, 44),
+                        tapTargetSize: MaterialTapTargetSize.padded,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     // Botón eliminar
                     OutlinedButton.icon(
                       onPressed: tieneNinos
@@ -300,12 +302,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: tieneNinos
                             ? Colors.grey
-                            : Colors.red,
+                            : Colors.red.shade700,
                         side: BorderSide(
                           color: tieneNinos
                               ? Colors.grey.shade300
                               : Colors.red.shade300,
                         ),
+                        minimumSize: const Size(44, 44),
+                        tapTargetSize: MaterialTapTargetSize.padded,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,

@@ -22,16 +22,14 @@ Este proyecto requiere configuración manual de Firebase. Sigue estos pasos:
 4. Elige **Start in production mode** o **Start in test mode** (test mode permite acceso público inicial)
 5. Crea la base de datos
 
-**Reglas de Firestore (para desarrollo inicial):**
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true; // Solo para desarrollo, cambiar para producción
-    }
-  }
-}
+**Reglas de Firestore:**
+
+Este proyecto ya usa reglas de producción (ver `firestore.rules` en la raíz),
+que exigen sesión iniciada (`request.auth != null`) para leer o escribir en
+las colecciones `grupos`, `ninos` y `abonos`. Despliega ese archivo con:
+
+```bash
+firebase deploy --only firestore:rules
 ```
 
 ### 3. Configurar Authentication
@@ -40,6 +38,31 @@ service cloud.firestore {
 2. Haz clic en "Get Started"
 3. En la pestaña **Sign-in method**, selecciona **Email/Password**
 4. Habilita el proveedor y haz clic en "Save"
+
+### 3.1 Crear los usuarios manualmente (Carito y "El Otro")
+
+La app **no tiene pantalla de registro pública**: por seguridad, los únicos
+usuarios que pueden ingresar son los que se crean manualmente desde la
+consola de Firebase. Ambos usuarios tienen acceso completo a la app (no hay
+roles diferenciados). Para crear cada usuario:
+
+1. En Firebase Console, ve a **Authentication > Users**
+2. Haz clic en **"Add user"**
+3. Ingresa el correo electrónico del usuario (ej. `carito@ejemplo.com`)
+4. Ingresa una contraseña segura (mínimo 6 caracteres, recomendado usar un
+   gestor de contraseñas para generarla)
+5. Haz clic en **"Add user"** para confirmar
+6. Repite los pasos 2-5 para el segundo usuario ("El Otro")
+7. Comparte las credenciales con cada persona por un canal seguro (no por
+   correo ni chat sin cifrar)
+
+**Notas:**
+- Si un usuario olvida su contraseña, por ahora debe pedirte que se la
+  cambies manualmente desde **Authentication > Users** (clic en el usuario
+  → "Reset password" o edítala directamente). La recuperación de contraseña
+  self-service dentro de la app no está implementada todavía.
+- Para revocar el acceso de alguien, simplemente elimina o deshabilita su
+  usuario desde esa misma pantalla.
 
 ### 4. Configurar Hosting (Opcional, para web deployment)
 
@@ -138,11 +161,61 @@ lib/
 
 ## Próximos pasos (implementación pendiente)
 
-- [ ] Modelo de datos para Users, Groups, Children, Payments
-- [ ] Pantalla de autenticación (Login/Registro)
-- [ ] Pantalla principal de gestión de grupos
-- [ ] Pantalla de registro de pagos
-- [ ] Lógica de negocio para cálculos y notificaciones
+- [x] Modelo de datos para Grupos, Niños, Abonos
+- [x] Pantalla de autenticación (Login; sin registro público, ver sección 3.1)
+- [x] Pantalla principal de gestión de grupos
+- [x] Pantalla de registro de pagos
+- [ ] Recuperación de contraseña ("olvidé mi contraseña") dentro de la app
+- [ ] Lógica de negocio adicional para notificaciones
+
+## Despliegue a producción
+
+La app web se despliega como PWA (Progressive Web App) en Firebase Hosting.
+`firebase.json` ya está configurado para servir el contenido generado en
+`build/web`. Para desplegar una nueva versión, ejecuta estos comandos en orden:
+
+```bash
+flutter build web --release
+firebase deploy --only hosting
+```
+
+- **`flutter build web --release`**: compila la app Flutter para web en modo
+  release (optimizada, minificada) y genera todos los archivos estáticos
+  (HTML, JS, assets, `manifest.json`, íconos, etc.) en la carpeta `build/web`.
+- **`firebase deploy --only hosting`**: sube el contenido de `build/web` (según
+  la configuración `"public": "build/web"` en `firebase.json`) a Firebase
+  Hosting, publicando la nueva versión en la URL del proyecto.
+
+Requisitos previos: tener Firebase CLI instalado y haber iniciado sesión
+(`firebase login`), y que el proyecto Flutter esté correctamente enlazado al
+proyecto de Firebase (ver `.firebaserc` / `flutterfire configure`).
+
+### Iconos de la PWA
+
+Los íconos en `web/icons/` (`Icon-192.png`, `Icon-512.png`,
+`Icon-maskable-192.png`, `Icon-maskable-512.png`) y `web/favicon.png` son
+**placeholders generados automáticamente**: un cuadro azul con las iniciales
+"CP". Puedes reemplazarlos en cualquier momento por un diseño real,
+manteniendo los mismos nombres de archivo y tamaños (192x192 y 512x512, más
+sus versiones maskable) para que `manifest.json` siga funcionando sin
+cambios adicionales.
+
+### Instalar la PWA en un iPhone
+
+Una vez desplegada la app en Firebase Hosting, para instalarla en la pantalla
+de inicio de un iPhone:
+
+1. Abre la URL de la app **en Safari** (en iOS, "Agregar a pantalla de
+   inicio" para PWAs solo está disponible en Safari; no funciona desde Chrome
+   ni otros navegadores en iOS).
+2. Toca el botón de **compartir** (el ícono del cuadrado con la flecha hacia
+   arriba, en la barra inferior o superior de Safari).
+3. Selecciona **"Agregar a pantalla de inicio"** ("Add to Home Screen").
+4. Confirma el nombre y toca **"Agregar"**.
+
+La app quedará instalada como un ícono más en la pantalla de inicio y se
+abrirá en modo standalone (sin la barra de navegación de Safari), usando el
+ícono y el nombre configurados en `web/manifest.json` y `web/index.html`.
 
 ## Soporte
 

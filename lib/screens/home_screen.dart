@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/grupo.dart';
 import '../services/grupo_service.dart';
 import '../services/nino_service.dart';
+import '../services/auth_service.dart';
 import 'admin_screen.dart';
 import 'realizar_pago_screen.dart';
 import 'grupo_detalle_screen.dart';
@@ -18,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final GrupoService _grupoService = GrupoService();
   final NinoService _ninoService = NinoService();
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (context) => const AdminScreen()),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar sesión',
+            onPressed: () => _authService.cerrarSesion(),
           ),
         ],
       ),

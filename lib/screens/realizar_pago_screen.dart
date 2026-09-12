@@ -33,6 +33,8 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
   bool _cargandoNinos = true;
   String? _errorCarga;
 
+  final GlobalKey _formularioPagoKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +78,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         _ninosFiltrados = _todosLosNinos;
       } else {
         _ninosFiltrados = _todosLosNinos
-            .where((nino) => nino.nombre.toLowerCase().contains(query))
+            .where((nino) => nino.nombreCompleto.toLowerCase().contains(query))
             .toList();
       }
     });
@@ -107,29 +109,53 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
     }
   }
 
+  /// Limpia la selección actual y regresa a la vista de búsqueda/lista
+  void _limpiarSeleccion() {
+    setState(() {
+      _ninoSeleccionado = null;
+      _grupoSeleccionado = null;
+      _mesSeleccionado = null;
+      _montoController.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Realizar Pago'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+    final hayNinoSeleccionado = _ninoSeleccionado != null;
+
+    return PopScope(
+      canPop: !hayNinoSeleccionado,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && hayNinoSeleccionado) {
+          _limpiarSeleccion();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Realizar Pago'),
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (hayNinoSeleccionado) {
+                _limpiarSeleccion();
+              } else {
+                Navigator.pop(context);
+              }
+            },
+          ),
         ),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     return Column(
       children: [
-        // Campo de búsqueda
-        _buildSearchField(),
-        
+        // Campo de búsqueda: solo visible mientras no hay un niño seleccionado
+        if (_ninoSeleccionado == null) _buildSearchField(),
+
         // Contenido principal
         Expanded(
           child: _ninoSeleccionado == null
@@ -266,7 +292,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
             leading: CircleAvatar(
               backgroundColor: Colors.blue.shade100,
               child: Text(
-                nino.nombre[0].toUpperCase(),
+                nino.nombreCompleto[0].toUpperCase(),
                 style: TextStyle(
                   color: Colors.blue.shade700,
                   fontWeight: FontWeight.bold,
@@ -274,7 +300,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
               ),
             ),
             title: Text(
-              nino.nombre,
+              nino.nombreCompleto,
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -306,9 +332,12 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
           // Cuadrícula de meses
           _buildCuadriculaMeses(anioActual),
           const SizedBox(height: 24),
-          
+
           // Formulario de pago
-          _buildFormularioPago(anioActual),
+          KeyedSubtree(
+            key: _formularioPagoKey,
+            child: _buildFormularioPago(anioActual),
+          ),
         ],
       ),
     );
@@ -328,7 +357,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                   backgroundColor: Colors.green.shade100,
                   radius: 24,
                   child: Text(
-                    _ninoSeleccionado!.nombre[0].toUpperCase(),
+                    _ninoSeleccionado!.nombreCompleto[0].toUpperCase(),
                     style: TextStyle(
                       color: Colors.green.shade700,
                       fontWeight: FontWeight.bold,
@@ -342,7 +371,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _ninoSeleccionado!.nombre,
+                        _ninoSeleccionado!.nombreCompleto,
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -466,7 +495,11 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                       itemBuilder: (context, index) {
                         final mes = index + 1;
                         final resultado = resultadoAnual.obtenerResultadoMes(mes);
-                        return _buildMesCard(resultado!);
+                        final esNoAplica = resultado!.estado == 'no_aplica';
+                        return _buildMesCard(
+                          resultado,
+                          onTap: esNoAplica ? null : () => _onMesTap(resultado),
+                        );
                       },
                     );
                   },
@@ -479,11 +512,37 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
     );
   }
 
-  Widget _buildMesCard(ResultadoMes resultado) {
+  /// Selecciona el mes tocado en la cuadrícula, precarga el monto con el
+  /// saldo pendiente de ese mes y hace scroll hacia el formulario de pago.
+  void _onMesTap(ResultadoMes resultado) {
+    setState(() {
+      _mesSeleccionado = resultado.mes;
+      if (resultado.saldoPendienteDelMes > 0) {
+        _montoController.text = resultado.saldoPendienteDelMes.toStringAsFixed(2);
+      } else {
+        _montoController.clear();
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final formularioContext = _formularioPagoKey.currentContext;
+      if (formularioContext != null) {
+        Scrollable.ensureVisible(
+          formularioContext,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  Widget _buildMesCard(ResultadoMes resultado, {required VoidCallback? onTap}) {
     final nombresMeses = [
       'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
       'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
     ];
+
+    final esNoAplica = resultado.estado == 'no_aplica';
 
     Color backgroundColor;
     Color textColor;
@@ -505,41 +564,59 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         textColor = Colors.orange.shade700;
         icon = Icons.pending;
         break;
+      case 'no_aplica':
+        backgroundColor = Colors.grey.shade100;
+        textColor = Colors.grey.shade400;
+        icon = Icons.remove;
+        break;
       default:
         backgroundColor = Colors.grey.shade100;
         textColor = Colors.grey.shade700;
         icon = Icons.help;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor,
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(6),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: textColor.withOpacity(0.3)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: textColor, size: 16),
-          const SizedBox(height: 2),
-          Text(
-            nombresMeses[resultado.mes - 1],
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: textColor,
-              fontSize: 11,
-            ),
+        // Los meses "no_aplica" (anteriores al ingreso del niño) no son
+        // interactivos: no tiene sentido registrar un pago en un mes en el
+        // que el niño aún no estaba inscrito.
+        onTap: esNoAplica ? null : onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: textColor.withOpacity(0.3)),
           ),
-          const SizedBox(height: 1),
-          Text(
-            '\$${resultado.saldoPendienteDelMes.toStringAsFixed(0)}',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 9,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: textColor, size: 16),
+              const SizedBox(height: 2),
+              Text(
+                nombresMeses[resultado.mes - 1],
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                esNoAplica
+                    ? '—'
+                    : '\$${resultado.saldoPendienteDelMes.toStringAsFixed(0)}',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 9,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -563,16 +640,30 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
           anio: anio,
         );
 
-        // Preseleccionar el primer mes con saldo pendiente
+        // Preseleccionar el primer mes con saldo pendiente, saltando
+        // cualquier mes "no_aplica" (anterior a la fecha de ingreso).
         if (_mesSeleccionado == null) {
           for (int mes = 1; mes <= 12; mes++) {
             final resultado = resultadoAnual.obtenerResultadoMes(mes);
-            if (resultado != null && resultado.saldoPendienteDelMes > 0) {
+            if (resultado != null &&
+                resultado.estado != 'no_aplica' &&
+                resultado.saldoPendienteDelMes > 0) {
               _mesSeleccionado = mes;
               break;
             }
           }
-          // Si no hay meses pendientes, preseleccionar enero
+          // Si no hay meses pendientes, preseleccionar el primer mes
+          // aplicable (no "no_aplica").
+          if (_mesSeleccionado == null) {
+            for (int mes = 1; mes <= 12; mes++) {
+              final resultado = resultadoAnual.obtenerResultadoMes(mes);
+              if (resultado != null && resultado.estado != 'no_aplica') {
+                _mesSeleccionado = mes;
+                break;
+              }
+            }
+          }
+          // Caso extremo: todos los meses son "no_aplica"
           _mesSeleccionado ??= 1;
         }
 
@@ -605,14 +696,18 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
                   items: List.generate(12, (index) {
                     final mes = index + 1;
                     final resultado = resultadoAnual.obtenerResultadoMes(mes);
+                    final esNoAplica = resultado?.estado == 'no_aplica';
                     return DropdownMenuItem(
                       value: mes,
+                      enabled: !esNoAplica,
                       child: Text(
                         _getNombreMes(mes),
                         style: TextStyle(
-                          color: resultado?.estado == 'pagado' 
-                              ? Colors.green 
-                              : null,
+                          color: esNoAplica
+                              ? Colors.grey.shade400
+                              : resultado?.estado == 'pagado'
+                                  ? Colors.green
+                                  : null,
                         ),
                       ),
                     );
@@ -713,6 +808,7 @@ class _RealizarPagoScreenState extends State<RealizarPagoScreen> {
         anio: anio,
         mesSeleccionado: _mesSeleccionado!,
         montoTotal: monto,
+        fechaIngreso: _ninoSeleccionado!.fechaIngreso,
       );
 
       if (mounted) {

@@ -6,6 +6,7 @@ import '../services/grupo_service.dart';
 import '../services/nino_service.dart';
 import '../services/abono_service.dart';
 import '../services/calculo_service.dart';
+import 'agregar_nino_bottom_sheet.dart';
 
 /// Pantalla de detalle de un grupo que muestra los niños y su estado de pagos
 class GrupoDetalleScreen extends StatefulWidget {
@@ -337,7 +338,9 @@ class _GrupoDetalleScreenState extends State<GrupoDetalleScreen> {
           anio: anioActual,
         );
 
-        final deudaTotal = resultadoAnual.deudaTotalAnual;
+        // La deuda mostrada en el banner solo considera los meses ya
+        // "vencidos" (hasta el mes actual), nunca meses futuros.
+        final deudaTotal = resultadoAnual.deudaVisibleActual;
         final estado = _determinarEstadoConsolidado(deudaTotal);
 
         return Card(
@@ -374,7 +377,7 @@ class _GrupoDetalleScreenState extends State<GrupoDetalleScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          nino.nombre,
+                          nino.nombreCompleto,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -382,6 +385,27 @@ class _GrupoDetalleScreenState extends State<GrupoDetalleScreen> {
                         ),
                         const SizedBox(height: 8),
                         _buildEstadoBadge(estado, deudaTotal),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 8,
+                          children: [
+                            _buildAccionNinoButton(
+                              icon: Icons.edit,
+                              label: 'Editar',
+                              color: Colors.blueGrey.shade700,
+                              tooltip: 'Editar niño',
+                              onPressed: () => _mostrarEditarNinoBottomSheet(nino),
+                            ),
+                            _buildAccionNinoButton(
+                              icon: Icons.delete,
+                              label: 'Eliminar',
+                              color: Colors.red.shade700,
+                              tooltip: 'Eliminar niño',
+                              onPressed: () => _mostrarConfirmarEliminarNino(nino),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -431,6 +455,34 @@ class _GrupoDetalleScreenState extends State<GrupoDetalleScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Botón de acción (editar/eliminar) con separación y área táctil
+  /// suficientes para evitar toques accidentales entre ambos.
+  Widget _buildAccionNinoButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: color,
+          minimumSize: const Size(44, 44),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
       ),
     );
   }
@@ -521,6 +573,138 @@ class _GrupoDetalleScreenState extends State<GrupoDetalleScreen> {
       ),
     );
   }
+
+  void _mostrarEditarNinoBottomSheet(Nino nino) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AgregarNinoBottomSheet(nino: nino),
+    );
+  }
+
+  void _mostrarConfirmarEliminarNino(Nino nino) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Eliminar niño'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Seguro que deseas eliminar a ${nino.nombreCompleto}? '
+                'Esta acción no se puede deshacer y también eliminará su '
+                'historial de pagos registrados.',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              // Advertencia adicional si el niño tiene abonos registrados
+              FutureBuilder<List<Abono>>(
+                future: _abonoService.obtenerAbonosPorNino(nino.id),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+
+                  final cantidadAbonos = snapshot.data?.length ?? 0;
+                  if (cantidadAbonos == 0) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final plural = cantidadAbonos == 1 ? '' : 's';
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Este niño tiene $cantidadAbonos pago$plural '
+                            'registrado$plural. Al eliminarlo, ese historial '
+                            'también se perderá permanentemente.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _eliminarNino(nino);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _eliminarNino(Nino nino) async {
+    try {
+      await _ninoService.eliminarNino(nino.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Niño eliminado correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar el niño: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 }
 
 /// BottomSheet para mostrar el detalle de pagos de un niño
@@ -540,7 +724,9 @@ class NinoDetalleBottomSheet extends StatelessWidget {
     final anio = resultadoAnual.anio;
     final valorCobro = resultadoAnual.valorCobro;
     final resultadosPorMes = resultadoAnual.resultadosPorMes as List;
-    final deudaTotal = resultadoAnual.deudaTotalAnual;
+    // Igual que en la tarjeta de la lista: solo cuenta lo ya "vencido"
+    // hasta el mes actual, nunca meses futuros.
+    final deudaTotal = resultadoAnual.deudaVisibleActual;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
@@ -583,7 +769,7 @@ class NinoDetalleBottomSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        nino.nombre,
+                        nino.nombreCompleto,
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -707,6 +893,7 @@ class NinoDetalleBottomSheet extends StatelessWidget {
     final estado = resultadoMes.estado;
     final montoAbonado = resultadoMes.montoAbonadoDelMes;
     final saldoPendiente = resultadoMes.saldoPendienteDelMes;
+    final esNoAplica = estado == 'no_aplica';
 
     final colorLight = _getMesColorLight(estado);
     final colorDark = _getMesColorDark(estado);
@@ -741,9 +928,10 @@ class NinoDetalleBottomSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          // Monto abonado
+          // Monto abonado (los meses "no_aplica", antes del ingreso del
+          // niño, no muestran ningún monto)
           Text(
-            '\$${montoAbonado.toStringAsFixed(0)}',
+            esNoAplica ? '—' : '\$${montoAbonado.toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: 11,
               color: Colors.grey,
@@ -751,7 +939,7 @@ class NinoDetalleBottomSheet extends StatelessWidget {
             ),
           ),
           // Saldo pendiente si aplica
-          if (saldoPendiente > 0)
+          if (!esNoAplica && saldoPendiente > 0)
             Text(
               'Pend: \$${saldoPendiente.toStringAsFixed(0)}',
               style: const TextStyle(
@@ -773,6 +961,8 @@ class NinoDetalleBottomSheet extends StatelessWidget {
         return Colors.red.shade50;
       case 'abono_parcial':
         return Colors.orange.shade50;
+      case 'no_aplica':
+        return Colors.grey.shade100;
       default:
         return Colors.grey.shade50;
     }
@@ -786,6 +976,8 @@ class NinoDetalleBottomSheet extends StatelessWidget {
         return Colors.red.shade300;
       case 'abono_parcial':
         return Colors.orange.shade300;
+      case 'no_aplica':
+        return Colors.grey.shade300;
       default:
         return Colors.grey.shade300;
     }
@@ -799,6 +991,8 @@ class NinoDetalleBottomSheet extends StatelessWidget {
         return Colors.red.shade700;
       case 'abono_parcial':
         return Colors.orange.shade700;
+      case 'no_aplica':
+        return Colors.grey.shade400;
       default:
         return Colors.grey.shade700;
     }
@@ -812,6 +1006,8 @@ class NinoDetalleBottomSheet extends StatelessWidget {
         return Icons.error;
       case 'abono_parcial':
         return Icons.pending;
+      case 'no_aplica':
+        return Icons.remove;
       default:
         return Icons.help_outline;
     }

@@ -87,6 +87,15 @@ class AbonoService {
     });
   }
 
+  /// Obtiene todos los abonos de un niño (todos los años), de forma puntual
+  Future<List<Abono>> obtenerAbonosPorNino(String ninoId) async {
+    final snapshot = await _firestore
+        .collection(_collection)
+        .where('ninoId', isEqualTo: ninoId)
+        .get();
+    return snapshot.docs.map((doc) => Abono.fromFirestore(doc)).toList();
+  }
+
   /// Obtiene un abono específico por ID
   Future<Abono?> obtenerAbonoPorId(String id) async {
     final doc = await _firestore.collection(_collection).doc(id).get();
@@ -163,20 +172,29 @@ class AbonoService {
     required int anio,
     required int mesSeleccionado,
     required num montoTotal,
+    required DateTime fechaIngreso,
     DateTime? fechaAbono,
   }) async {
     final fecha = fechaAbono ?? DateTime.now();
     final batch = _firestore.batch();
-    
+
     // Obtener abonos existentes del niño en el año
     final abonosExistentes = await obtenerAbonosPorNinoYAnio(
       ninoId: ninoId,
       anio: anio,
     );
-    
+
     // Calcular saldos pendientes de cada mes
     final resultadoAnual = CalculoService.calcularResultadoAnual(
-      nino: Nino(id: ninoId, nombre: '', grupoId: grupo.id),
+      nino: Nino(
+        id: ninoId,
+        nombre: '',
+        primerApellido: '',
+        nombreAcudiente: '',
+        telefonoAcudiente: '',
+        grupoId: grupo.id,
+        fechaIngreso: fechaIngreso,
+      ),
       grupo: grupo,
       abonos: abonosExistentes,
       anio: anio,
@@ -198,25 +216,35 @@ class AbonoService {
     // 1. Meses ANTERIORES al mesSeleccionado con saldo pendiente > 0 (en orden cronológico)
     // 2. El mesSeleccionado mismo (si tiene saldo pendiente > 0)
     // 3. Meses POSTERIORES al mesSeleccionado (en orden cronológico, como pago anticipado)
+    // En todos los casos se excluyen los meses en estado "no_aplica" (antes
+    // de la fecha de ingreso del niño): el excedente nunca debe cascadear
+    // hacia meses en los que el niño aún no estaba inscrito.
     final List<int> secuenciaMeses = [];
-    
+
     // Paso 1: Agregar meses anteriores con saldo pendiente (en orden cronológico)
     for (int mes = 1; mes < mesSeleccionado; mes++) {
       final resultado = resultadoAnual.obtenerResultadoMes(mes);
-      if (resultado != null && resultado.saldoPendienteDelMes > 0) {
+      if (resultado != null &&
+          resultado.estado != 'no_aplica' &&
+          resultado.saldoPendienteDelMes > 0) {
         secuenciaMeses.add(mes);
       }
     }
-    
+
     // Paso 2: Agregar el mes seleccionado si tiene saldo pendiente
     final resultadoMesSeleccionado = resultadoAnual.obtenerResultadoMes(mesSeleccionado);
-    if (resultadoMesSeleccionado != null && resultadoMesSeleccionado.saldoPendienteDelMes > 0) {
+    if (resultadoMesSeleccionado != null &&
+        resultadoMesSeleccionado.estado != 'no_aplica' &&
+        resultadoMesSeleccionado.saldoPendienteDelMes > 0) {
       secuenciaMeses.add(mesSeleccionado);
     }
-    
+
     // Paso 3: Agregar meses posteriores (en orden cronológico, como pago anticipado)
     for (int mes = mesSeleccionado + 1; mes <= 12; mes++) {
-      secuenciaMeses.add(mes);
+      final resultado = resultadoAnual.obtenerResultadoMes(mes);
+      if (resultado != null && resultado.estado != 'no_aplica') {
+        secuenciaMeses.add(mes);
+      }
     }
     
     // Recorrer la secuencia aplicando el monto mes por mes
